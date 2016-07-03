@@ -12,6 +12,7 @@ use yii\widgets\ActiveForm;
 use yii2mod\comments\models\CommentModel;
 use yii2mod\comments\Module;
 
+
 /**
  * Class DefaultController
  * @package yii2mod\comments\controllers
@@ -19,8 +20,7 @@ use yii2mod\comments\Module;
 class DefaultController extends Controller
 {
     /**
-     * Returns a list of behaviors that this component should behave as.
-     * 
+     * Behaviors
      * @return array
      */
     public function behaviors()
@@ -30,6 +30,7 @@ class DefaultController extends Controller
                 'class' => VerbFilter::className(),
                 'actions' => [
                     'create' => ['post'],
+                    'update' => ['post'],
                     'delete' => ['post', 'delete']
                 ],
             ],
@@ -38,12 +39,12 @@ class DefaultController extends Controller
 
     /**
      * Create comment.
-     * 
-     * @param $entity string encrypt entity
      * @return array|null|Response
      */
-    public function actionCreate($entity)
+    public function actionCreate()
     {
+        $request = Yii::$app->request;
+        $entity = urldecode($request->post('entity'));
         Yii::$app->response->format = Response::FORMAT_JSON;
         /* @var $module Module */
         $module = Yii::$app->getModule(Module::$name);
@@ -71,7 +72,42 @@ class DefaultController extends Controller
     }
 
     /**
-     * Delete comment.
+     * Create comment.
+     * @return array|null|Response
+     */
+    public function actionUpdate($id)
+    {
+        $request = Yii::$app->request;
+        $entity = urldecode($request->post('entity'));
+        Yii::$app->response->format = Response::FORMAT_JSON;
+        /* @var $module Module */
+        $module = Yii::$app->getModule(Module::$name);
+        $commentModelClass = $module->commentModelClass;
+        $decryptEntity = Yii::$app->getSecurity()->decryptByKey($entity, $module::$name);
+        if ($decryptEntity !== false) {
+            $entityData = Json::decode($decryptEntity);
+            /* @var $model CommentModel */
+            $model = $this->findModel($id);
+            $model->setAttributes($entityData);
+            $model->content = $request->post('CommentModel')["content"];
+            if ($model->validate() && $model->save()) {
+                return ['status' => 'success'];
+            } else {
+                return [
+                    'status' => 'error',
+                    'errors' => ActiveForm::validate($model)
+                ];
+            }
+        } else {
+            return [
+                'status' => 'error',
+                'message' => Yii::t('yii2mod.comments', 'Oops, something went wrong. Please try again later.')
+            ];
+        }
+    }
+
+    /**
+     * Delete comment page.
      *
      * @param integer $id Comment ID
      * @return string Comment text

@@ -13,16 +13,23 @@ use yii\helpers\Url;
         <li class="comment" id="comment-<?php echo $comment->id ?>">
             <div class="comment-content" data-comment-content-id="<?php echo $comment->id ?>">
                 <div class="comment-author-avatar">
-                    <?php echo Html::img($comment->getAvatar(), ['alt' => $comment->getAuthorName()]); ?>
+                    <?php echo $comment->getAvatar(['alt' => $comment->getAuthorName()]); ?>
                 </div>
                 <div class="comment-details">
                     <?php if ($comment->isActive): ?>
                         <div class="comment-action-buttons">
                             <?php if (Yii::$app->getUser()->can('admin')): ?>
-                                <?php echo Html::a('<span class="glyphicon glyphicon-trash"></span> Delete', '#', ['data' => ['action' => 'delete', 'url' => Url::to(['/comment/default/delete', 'id' => $comment->id]), 'comment-id' => $comment->id]]); ?>
+                                <?= Html::a('<span class="glyphicon glyphicon-trash"></span> Delete', '#', ['data' => ['action' => 'delete', 'url' => Url::to(['/comment/default/delete', 'id' => $comment->id]), 'comment-id' => $comment->id]]); ?>
+                            <?php endif; ?>
+                            <?php if (
+                                (!Yii::$app->user->isGuest) && 
+                                ($comment->createdBy == Yii::$app->user->identity->id)
+                            ):
+                            ?>
+                                <?= Html::a('<span class="glyphicon glyphicon-edit"></span> Edit', '#', ['data' => ['action' => 'update', 'url' => Url::to(['/comment/default/update', 'id' => $comment->id]), 'comment-id' => $comment->id]]); ?>
                             <?php endif; ?>
                             <?php if (!Yii::$app->user->isGuest && ($comment->level < $maxLevel || is_null($maxLevel))): ?>
-                                <?php echo Html::a("<span class='glyphicon glyphicon-share-alt'></span> Reply", '#', ['class' => 'comment-reply', 'data' => ['action' => 'reply', 'comment-id' => $comment->id]]); ?>
+                                <?= Html::a("<span class='glyphicon glyphicon-share-alt'></span> Reply", '#', ['class' => 'comment-reply', 'data' => ['action' => 'reply', 'url' => Url::to(['/comment/default/create']),'comment-id' => $comment->id]]); ?>
                             <?php endif; ?>
                         </div>
                     <?php endif; ?>
