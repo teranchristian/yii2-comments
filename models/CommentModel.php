@@ -7,6 +7,7 @@ use yii\behaviors\BlameableBehavior;
 use yii\behaviors\TimestampBehavior;
 use yii\db\ActiveRecord;
 use yii\helpers\ArrayHelper;
+use yii\helpers\Html;
 use yii2mod\behaviors\PurifyBehavior;
 use yii2mod\comments\models\enums\CommentStatus;
 use yii2mod\comments\Module;
@@ -37,7 +38,6 @@ class CommentModel extends ActiveRecord
 
     /**
      * Declares the name of the database table associated with this AR class.
-     *
      * @return string the table name
      */
     public static function tableName()
@@ -47,7 +47,6 @@ class CommentModel extends ActiveRecord
 
     /**
      * Returns the validation rules for attributes.
-     *
      * @return array validation rules
      */
     public function rules()
@@ -62,7 +61,6 @@ class CommentModel extends ActiveRecord
 
     /**
      * Validate parentId attribute
-     *
      * @param $attribute
      */
     public function validateParentID($attribute)
@@ -75,9 +73,9 @@ class CommentModel extends ActiveRecord
         }
     }
 
+
     /**
      * Returns a list of behaviors that this component should behave as.
-     *
      * @return array
      */
     public function behaviors()
@@ -90,24 +88,21 @@ class CommentModel extends ActiveRecord
             ],
             'timestamp' => [
                 'class' => TimestampBehavior::className(),
-                'createdAtAttribute' => 'createdAt',
-                'updatedAtAttribute' => 'updatedAt'
+                'attributes' => [
+                    ActiveRecord::EVENT_BEFORE_INSERT => ['createdAt'],
+                    ActiveRecord::EVENT_BEFORE_UPDATE => ['updatedAt']
+                ]
             ],
             'purify' => [
                 'class' => PurifyBehavior::className(),
-                'attributes' => ['content'],
-                'config' => [
-                    'HTML.SafeIframe' => true,
-                    'URI.SafeIframeRegexp' => '%^(https?:)?//(www\.youtube(?:-nocookie)?\.com/embed/|player\.vimeo\.com/video/)%'
-                ]
+                'attributes' => ['content']
             ]
         ];
     }
 
     /**
      * Returns the attribute labels.
-     *
-     * @return array
+     * @return array attribute labels (name => label)
      */
     public function attributeLabels()
     {
@@ -127,7 +122,6 @@ class CommentModel extends ActiveRecord
 
     /**
      * @inheritdoc
-     *
      * @return CommentQuery
      */
     public static function find()
@@ -137,7 +131,6 @@ class CommentModel extends ActiveRecord
 
     /**
      * This method is called at the beginning of inserting or updating a record.
-     *
      * @param bool $insert
      * @return bool
      */
@@ -155,32 +148,12 @@ class CommentModel extends ActiveRecord
     }
 
     /**
-     * This method is called at the end of inserting or updating a record.
-     *
-     * @param bool $insert
-     * @param array $changedAttributes
-     */
-    public function afterSave($insert, $changedAttributes)
-    {
-        if (!$insert) {
-            // Mark all the nested comments as `deleted` after the comment was deleted
-            if (array_key_exists('status', $changedAttributes) && $this->status == CommentStatus::DELETED) {
-                self::updateAll(['status' => CommentStatus::DELETED], ['parentId' => $this->id]);
-            }
-        }
-        
-        parent::afterSave($insert, $changedAttributes);
-    }
-
-    /**
      * Author relation
-     *
      * @return \yii\db\ActiveQuery
      */
     public function getAuthor()
     {
         $module = Yii::$app->getModule(Module::$name);
-
         return $this->hasOne($module->userIdentityClass, ['id' => 'createdBy']);
     }
 
@@ -190,30 +163,21 @@ class CommentModel extends ActiveRecord
      * @param $entity string model class id
      * @param $entityId integer model id
      * @param null $maxLevel
-     * @param bool $showDeletedComments
      * @return array|\yii\db\ActiveRecord[] Comments tree
      */
-    public static function getTree($entity, $entityId, $maxLevel = null, $showDeletedComments = true)
+    public static function getTree($entity, $entityId, $maxLevel = null)
     {
         $query = self::find()->where([
             'entityId' => $entityId,
             'entity' => $entity,
         ])->with(['author']);
-
         if ($maxLevel > 0) {
             $query->andWhere(['<=', 'level', $maxLevel]);
         }
-
-        if (!$showDeletedComments) {
-            $query->active();
-        }
-
         $models = $query->orderBy(['parentId' => SORT_ASC, 'createdAt' => SORT_ASC])->all();
-
         if (!empty($models)) {
             $models = self::buildTree($models);
         }
-
         return $models;
     }
 
@@ -227,7 +191,6 @@ class CommentModel extends ActiveRecord
     protected static function buildTree(&$data, $rootID = 0)
     {
         $tree = [];
-
         foreach ($data as $id => $node) {
             if ($node->parentId == $rootID) {
                 unset($data[$id]);
@@ -235,19 +198,17 @@ class CommentModel extends ActiveRecord
                 $tree[] = $node;
             }
         }
-
         return $tree;
     }
 
     /**
      * Delete comment.
      *
-     * @return boolean whether comment was deleted or not
+     * @return boolean Whether comment was deleted or not
      */
     public function deleteComment()
     {
         $this->status = CommentStatus::DELETED;
-
         return $this->save(false, ['status', 'updatedBy', 'updatedAt']);
     }
 
@@ -273,7 +234,6 @@ class CommentModel extends ActiveRecord
 
     /**
      * Check if comment has children comment
-     *
      * @return bool
      */
     public function hasChildren()
@@ -299,7 +259,6 @@ class CommentModel extends ActiveRecord
 
     /**
      * Get comment posted date as relative time
-     *
      * @return string
      */
     public function getPostedDate()
@@ -309,7 +268,6 @@ class CommentModel extends ActiveRecord
 
     /**
      * Get author name
-     *
      * @return mixed
      */
     public function getAuthorName()
@@ -319,28 +277,25 @@ class CommentModel extends ActiveRecord
 
     /**
      * Get comment content
-     *
      * @param string $deletedCommentText
      * @return string
      */
     public function getContent($deletedCommentText = 'Comment was deleted.')
     {
-        return $this->isDeleted ? $deletedCommentText : nl2br($this->content);
+        return $this->isDeleted ? $deletedCommentText : Yii::$app->formatter->asNtext($this->content);
     }
 
     /**
      * Get avatar user
-     *
+     * @param array $imgOptions
      * @return string
      */
-    public function getAvatar()
+    public function getAvatar($imgOptions = [])
     {
-        if ($this->author->hasMethod('getAvatar')) {
-            return $this->author->getAvatar();
-        } else {
-            return "http://www.gravatar.com/avatar/00000000000000000000000000000000?d=mm&f=y&s=50";
-        }
+        $imgOptions = ArrayHelper::merge($imgOptions, ['class' => 'img-responsive']);
+        return Html::img("http://gravatar.com/avatar/{$this->author->id}/?s=50", $imgOptions);
     }
+
 
     /**
      * This function used for filter in gridView, for attribute `createdBy`.
@@ -349,22 +304,5 @@ class CommentModel extends ActiveRecord
     public static function getListAuthorsNames()
     {
         return ArrayHelper::map(self::find()->joinWith('author')->all(), 'createdBy', 'author.username');
-    }
-
-    /**
-     * Get comments count
-     *
-     * @param bool $onlyActiveComments
-     * @return int|string
-     */
-    public function getCommentsCount($onlyActiveComments = true)
-    {
-        $query = self::find()->where(['entity' => $this->entity, 'entityId' => $this->entityId]);
-
-        if ($onlyActiveComments) {
-            $query->active();
-        }
-
-        return $query->count();
     }
 }

@@ -9,15 +9,16 @@ use yii\widgets\Pjax;
 /* @var $encryptedEntity string */
 /* @var $pjaxContainerId string */
 /* @var $formId string comment form id */
-/* @var $showDeletedComments boolean show deleted comments. */
 ?>
-<?php Pjax::begin(['enablePushState' => false, 'timeout' => 20000, 'id' => $pjaxContainerId]); ?>
+<?php Pjax::begin([
+    'enablePushState' => false,
+    'timeout' => 10000,
+    'id' => $pjaxContainerId
+]); ?>
 <div class="comments row">
     <div class="col-md-12 col-sm-12">
         <div class="title-block clearfix">
-            <h3 class="h3-body-title">
-                <?php echo Yii::t('yii2mod.comments', "Comments ({0})", $commentModel->getCommentsCount($showDeletedComments ? false : true)); ?>
-            </h3>
+            <h3 class="h3-body-title"><?php echo Yii::t('yii2mod.comments', 'Comments'); ?></h3>
             <div class="title-separator"></div>
         </div>
         <ol class="comments-list">
@@ -33,3 +34,4 @@ use yii\widgets\Pjax;
     </div>
 </div>
 <?php Pjax::end(); ?>
+

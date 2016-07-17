@@ -5,14 +5,13 @@ namespace yii2mod\comments\widgets;
 use Yii;
 use yii\base\InvalidConfigException;
 use yii\base\Widget;
-use yii\helpers\ArrayHelper;
 use yii\helpers\Json;
 use yii2mod\comments\CommentAsset;
 use yii2mod\comments\Module;
 
 /**
  * Class Comment
- * @package yii2mod\comments\widgets
+ * @package app\components\comment\widgets
  */
 class Comment extends Widget
 {
@@ -38,19 +37,9 @@ class Comment extends Widget
     public $formId = 'comment-form';
 
     /**
-     * @var string pjax container id
-     */
-    public $pjaxContainerId;
-
-    /**
      * @var null|integer maximum comments level, level starts from 1, null - unlimited level;
      */
     public $maxLevel = 7;
-
-    /**
-     * @var boolean show deleted comments. Defaults to `false`.
-     */
-    public $showDeletedComments = false;
 
     /**
      * @var string entity id attribute
@@ -78,6 +67,11 @@ class Comment extends Widget
     protected $encryptedEntityKey;
 
     /**
+     * @var string pjax container id, generated automatically
+     */
+    protected $pjaxContainerId;
+
+    /**
      * Initializes the widget params.
      */
     public function init()
@@ -85,24 +79,20 @@ class Comment extends Widget
         if (empty($this->model)) {
             throw new InvalidConfigException(Yii::t('yii2mod.comments', 'The "model" property must be set.'));
         }
-
-        if (empty($this->pjaxContainerId)) {
-            $this->pjaxContainerId = 'comment-pjax-container-' . $this->getId();
-        }
-
+        $this->pjaxContainerId = 'comment-pjax-container-' . $this->getId();
         $this->entity = hash('crc32', get_class($this->model));
         $this->entityId = $this->model->{$this->entityIdAttribute};
-
         if (empty($this->entityId)) {
             throw new InvalidConfigException(Yii::t('yii2mod.comments', 'The "entityIdAttribute" value for widget model cannot be empty.'));
         }
-
         if (empty($this->relatedTo)) {
             $this->relatedTo = get_class($this->model) . ':' . $this->entityId;
         }
-
-        $this->encryptedEntityKey = $this->generateEntityKey();
-
+        $this->encryptedEntityKey = Yii::$app->getSecurity()->encryptByKey(Json::encode([
+            'entity' => $this->entity,
+            'entityId' => $this->entityId,
+            'relatedTo' => $this->relatedTo
+        ]), Module::$name);
         $this->registerAssets();
     }
 
@@ -115,13 +105,8 @@ class Comment extends Widget
         /* @var $module Module */
         $module = Yii::$app->getModule(Module::$name);
         $commentModelClass = $module->commentModelClass;
-        $commentModel = Yii::createObject([
-            'class' => $commentModelClass,
-            'entity' => $this->entity,
-            'entityId' => $this->entityId
-        ]);
-
-        $comments = $commentModelClass::getTree($this->entity, $this->entityId, $this->maxLevel, $this->showDeletedComments);
+        $commentModel = Yii::createObject($commentModelClass);
+        $comments = $commentModelClass::getTree($this->entity, $this->entityId, $this->maxLevel);
 
         return $this->render($this->commentView, [
             'comments' => $comments,
@@ -129,8 +114,7 @@ class Comment extends Widget
             'maxLevel' => $this->maxLevel,
             'encryptedEntity' => $this->encryptedEntityKey,
             'pjaxContainerId' => $this->pjaxContainerId,
-            'formId' => $this->formId,
-            'showDeletedComments' => $this->showDeletedComments
+            'formId' => $this->formId
         ]);
     }
 
@@ -144,20 +128,7 @@ class Comment extends Widget
         $options = Json::encode($this->clientOptions);
         $view = $this->getView();
         CommentAsset::register($view);
-        $view->registerJs("jQuery('#{$this->formId}').comment({$options});");
+        $view->registerJs("jQuery('#$this->formId').comment($options);");
     }
 
-    /**
-     * Get encrypted entity key
-     *
-     * @return string
-     */
-    protected function generateEntityKey()
-    {
-        return Yii::$app->getSecurity()->encryptByKey(Json::encode([
-            'entity' => $this->entity,
-            'entityId' => $this->entityId,
-            'relatedTo' => $this->relatedTo
-        ]), Module::$name);
-    }
 }

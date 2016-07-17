@@ -50,6 +50,7 @@
                 $commentForm.on('beforeSubmit.comment', beforeSubmitForm);
                 var eventParams = {commentForm: $commentForm};
                 $(settings.pjaxContainerId).on('click.comment', '[data-action="reply"]', eventParams, reply);
+                $(settings.pjaxContainerId).on('click.comment', '[data-action="update"]', eventParams, update);
                 $(settings.pjaxContainerId).on('click.comment', '[data-action="cancel-reply"]', eventParams, cancelReply);
                 $(settings.pjaxContainerId).on('click.comment', '[data-action="delete"]', eventParams, deleteComment);
             });
@@ -113,6 +114,30 @@
         var parentCommentSelector = $this.parents('[data-comment-content-id="' + $this.data('comment-id') + '"]');
         //Move form to comment container
         $commentForm.appendTo(parentCommentSelector);
+        var form = parentCommentSelector.find('#comment-form');
+        form.attr('action', $this.data('url'));
+        //Update parentId field
+        $commentForm.find('[data-comment="parent-id"]').val($this.data('comment-id'));
+        //Show cancel reply link
+        $commentForm.find(settings.cancelReplyBtnSelector).show();
+    }
+
+    /**
+     * Update comment
+     * @param event
+     */
+    function update(event) {
+        event.preventDefault();
+        var $commentForm = event.data.commentForm;
+        var settings = $commentForm.data('comment');
+        var $this = $(this);
+        var parentCommentSelector = $this.parents('[data-comment-content-id="' + $this.data('comment-id') + '"]');
+        var editText = parentCommentSelector.find('.comment-body').text().trim();
+        $commentForm.find('#commentmodel-content').text(editText);
+        //Move form to comment container
+        $commentForm.appendTo(parentCommentSelector);
+        var form = parentCommentSelector.find('#comment-form');
+        form.attr('action', $this.data('url'));
         //Update parentId field
         $commentForm.find('[data-comment="parent-id"]').val($this.data('comment-id'));
         //Show cancel reply link
